@@ -4,6 +4,8 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+playwright/.auth/*.json
+!playwright/.auth/.gitkeep
 .env
 .env.*
 !.env.example

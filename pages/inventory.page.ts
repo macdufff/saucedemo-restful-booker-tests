@@ -1,10 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 
-export type SortOption =
-  | 'az'
-  | 'za'
-  | 'lohi'
-  | 'hilo';
+export type SortOption = 'az' | 'za' | 'lohi' | 'hilo';
 
 export class InventoryPage {
   readonly title: Locator;
@@ -14,19 +10,20 @@ export class InventoryPage {
   readonly sort: Locator;
   readonly cartLink: Locator;
   readonly cartBadge: Locator;
-  readonly menuButton: Locator;
-  readonly logoutLink: Locator;
 
   constructor(private readonly page: Page) {
-    this.title = page.locator('[data-test="title"]');
-    this.items = page.locator('[data-test="inventory-item"]');
-    this.itemNames = page.locator('[data-test="inventory-item-name"]');
-    this.itemPrices = page.locator('[data-test="inventory-item-price"]');
-    this.sort = page.locator('[data-test="product-sort-container"]');
-    this.cartLink = page.locator('[data-test="shopping-cart-link"]');
-    this.cartBadge = page.locator('[data-test="shopping-cart-badge"]');
-    this.menuButton = page.getByRole('button', { name: 'Open Menu' });
-    this.logoutLink = page.locator('[data-test="logout-sidebar-link"]');
+    this.title = page.getByTestId('title');
+    this.items = page.getByTestId('inventory-item');
+    this.itemNames = page.getByTestId('inventory-item-name');
+    this.itemPrices = page.getByTestId('inventory-item-price');
+    this.sort = page.getByTestId('product-sort-container');
+    this.cartLink = page.getByTestId('shopping-cart-link');
+    this.cartBadge = page.getByTestId('shopping-cart-badge');
+  }
+
+  async open() {
+    await this.page.goto('/inventory.html');
+    await this.expectLoaded();
   }
 
   async expectLoaded() {
@@ -49,18 +46,11 @@ export class InventoryPage {
   }
 
   async addToCartByName(name: string) {
-    const item = this.page
-      .locator('[data-test="inventory-item"]')
-      .filter({ has: this.page.locator('[data-test="inventory-item-name"]', { hasText: name }) });
+    const item = this.items.filter({ hasText: name });
     await item.getByRole('button', { name: 'Add to cart' }).click();
   }
 
   async openCart() {
     await this.cartLink.click();
-  }
-
-  async logout() {
-    await this.menuButton.click();
-    await this.logoutLink.click();
   }
 }

@@ -1,59 +1,68 @@
 # AI worklog
 
-Тести писались у Cursor (агент). Інструкції для наступних прогонів: `CLAUDE.md` і `.cursorrules`.
+**Agent:** Cursor (Grok 4.6) in pair-programming mode with a human reviewer.
 
-## Інструкції агенту
+**How it was used:** scaffolding Playwright config, POM, API client, CI YAML, and first-pass specs. The human (and later reruns) executed tests, rejected serial API coupling, and trimmed scope to the assessment limits.
 
-- `CLAUDE.md` — продукт, команди, scope, заборона `waitForTimeout`, правило фіксувати реальний HTTP-контракт.
-- `.cursorrules` — локатори Sauce Demo, Cookie-токен Restful Booker, DELETE=201, кошик = `.cart_item`.
+## Prompts (compressed)
 
-## Ключові промпти (скорочено)
+1. Build Playwright TS UI tests for Sauce Demo (`standard_user`) covering login, catalog, sort, cart, checkout, plus negatives.
+2. Restful Booker: auth → create → get → update → delete → 404, plus negatives. Cookie token, not Bearer.
+3. GitHub Actions on push/PR, HTML report artifact always.
+4. After failures: do not reuse `{ request }` from `beforeAll`; keep token/id in test scope; cleanup bookings in `finally`.
 
-1. «Зроби тестове: Playwright TS, Sauce Demo standard_user, 5–7 позитивних і 2–3 негативні, POM, data-test локатори.»
-2. «API Restful Booker: auth → create → update → delete → 404. Негативні кейси окремим файлом. Не використовуй Bearer.»
-3. «GitHub Actions: chromium, html report artifact always().»
-4. «Бонус: скрипт, на вході markdown (Steps / Expected), на виході spec.ts, опційно LLM.»
-5. Після першого фейлу: «Не реюзай `{ request }` з `beforeAll` у тестах Playwright — бери `request` у кожному тесті, стан (token, id) тримай у змінних describe.»
+## Architecture the agent proposed (kept)
 
-## Де агент помилився (і як це помітив)
+- Separate Playwright projects: `setup`, `ui`, `ui-login`, `api`.
+- `storageState` for authenticated UI so login is not copied into every spec.
+- API client + Zod schemas for response shape.
+- `testIdAttribute: 'data-test'` for Sauce Demo.
 
-### 1. Локатор кошика як у каталозі
+## Human review
 
-Агент поставив у `CartPage` `[data-test="inventory-item"]`. На cart.html рядки — `.cart_item`.  
-**Як помітив:** знання DOM Sauce Demo; інакше `toHaveCount` / `names()` були б порожні після add to cart. Виправлено до запуску, потім прогін 21 passed підтвердив.
+Every claim in README was either executed locally (`npm test`, `lint`, `typecheck`) or marked as not run (GitHub Actions job result).
 
-### 2. `request` з `beforeAll` у serial API-флоу
+## Real agent mistakes
 
-Перша версія тримала `BookingClient` на фікстурі `request` з `beforeAll`. Playwright: *Fixture { request } from beforeAll cannot be reused in a test.*  
-**Як помітив:** червоний прогін, 13-й тест, stack в `booking.client.ts`. Виправлення: `test.describe.configure({ mode: 'serial' })` + новий `request` на тест, `token`/`bookingId` у closure.
+### 1. Cart locators copied from inventory
 
-### 3. Очікування DELETE 204 / 200
+**Generated:** `CartPage` used `[data-test="inventory-item"]`.  
+**Why wrong:** cart.html rows are `.cart_item`.  
+**Found:** DOM knowledge + would yield empty names after add-to-cart.  
+**Fix:** `.cart_item` + `getByRole('button', { name: 'Remove' })`.  
+**Validated:** cart specs passed on Chromium.
 
-Типовий REST-інстинкт агента — `204`. Restful Booker відповідає **201**.  
-**Як помітив:** документація API + правило в `.cursorrules`; асерт зроблено `[201, 200]` до того, як зелений прогін це підтвердив.
+### 2. Reusing Playwright `request` from `beforeAll`
 
-### 4. Auth header як Bearer
+**Generated:** `BookingClient` stored the `beforeAll` `request` fixture and serial tests reused it.  
+**Why wrong:** Playwright forbids reusing `{ request }` from `beforeAll` inside tests.  
+**Found:** first API run, error *Fixture { request } from beforeAll cannot be reused in a test.*  
+**Fix:** one lifecycle test with `test.step`, local `request`, `finally` cleanup.  
+**Validated:** API project passed after the change.
 
-Чернетка клієнта мала `Authorization: Bearer ${token}`. Restful Booker хоче `Cookie: token=...`.  
-**Як помітив:** apidoc (PUT/DELETE). Без цього update/delete були б 403. Зафіксовано в `.cursorrules`.
+### 3. DELETE expected 204 / Bearer auth
 
-### 5. Архітектура браузера (x64 vs arm64)
+**Generated:** `expect(204)` and `Authorization: Bearer`.  
+**Why wrong:** Restful Booker documents Cookie `token=` and returns **201** on delete.  
+**Found:** apidoc + would 403 on PUT/DELETE.  
+**Fix:** Cookie header; assert `[201, 200]`.  
+**Validated:** lifecycle test passed including delete + GET 404.
 
-Перший UI-прогін: *Executable doesn't exist … chrome-headless-shell-mac-arm64* після того, як інсталятор у sandbox стягнув **mac-x64**.  
-**Як помітив:** текст помилки Playwright. Не баг тестів. Для локальної машини — `npx playwright install chromium` на arm64. У GitHub Actions образ ubuntu, проблема не відтворюється.
+### 4. Default suite included generated bonus specs
 
-## Бонус-конвеєр: 3 приклади
+**Generated:** Playwright project `bonus-snapshots` inside `npm test`.  
+**Why wrong:** assessment default run must be the mandatory suite; snapshots duplicate login/cart coverage.  
+**Found:** code review against the written requirements (“bonus only after mandatory”).  
+**Fix:** removed that project from `playwright.config.ts`. Generator stays optional.
 
-Генератор: `bonus/generate-test.ts`. Режим без API-ключа (правила). `--run` не підхопив файли поза `testDir` — **ручна правка процесу:** снапшоти лежать у `bonus/snapshots/` і окремий Playwright project `bonus-generated`.
+### 5. Empty POST treated as 400-or-500 (soft assertion)
 
-| Вхід | Згенерувалось | Пройшло | Руками |
-|------|----------------|---------|--------|
-| `bonus/examples/login.valid.md` | `goto` + fill + login + URL inventory | так (після додавання project) | не правив код тесту |
-| `bonus/examples/login.invalid.md` | error `do not match` | так | не правив код тесту |
-| `bonus/examples/add-to-cart.md` | add backpack + cart + ім’я в кошику | так | не правив код тесту; процес: скопіювати в `snapshots/` і підключити `testDir` |
+**Generated:** `expect([400, 500])` to “be nice” to the API.  
+**Why wrong:** hides the real contract (500). The assessment forbids weakening assertions to stay green.  
+**Found:** `curl` against POST `/booking` with `{}` returned 500.  
+**Fix:** assert `500` and document BUG-1.  
+**Validated:** negative API test aligned with the live response.
 
-Що генератор **не** вміє без дописування правил / LLM: довільний чекаут з first/last/zip, сортування, складні гілки. Це свідомий MVP.
+## What was not invented
 
-## Результат прогону (локально)
-
-`21 passed` на UI+API; плюс 3 snapshot-тести в окремому project після підключення.
+No Sauce Demo product bugs were recorded. Browser install x64-vs-arm64 was an environment issue in Cursor sandbox, not a product defect, so it is not listed as an application bug.

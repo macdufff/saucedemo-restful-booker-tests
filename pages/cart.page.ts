@@ -5,14 +5,13 @@ export class CartPage {
   readonly items: Locator;
   readonly itemNames: Locator;
   readonly checkout: Locator;
-  readonly continueShopping: Locator;
 
   constructor(private readonly page: Page) {
-    this.title = page.locator('[data-test="title"]');
+    this.title = page.getByTestId('title');
+    // Cart rows have no data-test / accessible name unique per line; class is the public DOM contract.
     this.items = page.locator('.cart_item');
-    this.itemNames = page.locator('[data-test="inventory-item-name"]');
-    this.checkout = page.locator('[data-test="checkout"]');
-    this.continueShopping = page.locator('[data-test="continue-shopping"]');
+    this.itemNames = page.getByTestId('inventory-item-name');
+    this.checkout = page.getByRole('button', { name: 'Checkout' });
   }
 
   async expectLoaded() {
@@ -25,9 +24,7 @@ export class CartPage {
   }
 
   async removeByName(name: string) {
-    const item = this.page
-      .locator('.cart_item')
-      .filter({ has: this.page.locator('[data-test="inventory-item-name"]', { hasText: name }) });
+    const item = this.items.filter({ hasText: name });
     await item.getByRole('button', { name: 'Remove' }).click();
   }
 }

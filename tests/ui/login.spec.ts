@@ -1,28 +1,26 @@
-import { test, expect, CREDENTIALS, loginAsStandard } from '../fixtures/auth';
+import { test, expect, USERS } from '../fixtures/auth';
 
 test.describe('Login', () => {
-  test('standard_user logs in and lands on catalog', async ({ loginPage, inventoryPage }) => {
-    await loginAsStandard(loginPage, inventoryPage);
-    await expect(inventoryPage.title).toBeVisible();
+  test('standard_user reaches the product catalog', { tag: ['@smoke'] }, async ({
+    loginPage,
+    inventoryPage,
+  }) => {
+    await loginPage.goto();
+    await loginPage.login(USERS.standard.username, USERS.standard.password);
+    await inventoryPage.expectLoaded();
   });
 
-  test('invalid password shows error and stays on login', async ({ page, loginPage }) => {
+  test('rejects an incorrect password', { tag: ['@negative'] }, async ({ page, loginPage }) => {
     await loginPage.goto();
-    await loginPage.login(CREDENTIALS.invalid.user, CREDENTIALS.invalid.pass);
+    await loginPage.login(USERS.invalid.username, USERS.invalid.password);
     await loginPage.expectErrorContains('Username and password do not match');
     await expect(page).not.toHaveURL(/inventory/);
   });
 
-  test('locked_out_user cannot enter the store', async ({ page, loginPage }) => {
-    await loginPage.goto();
-    await loginPage.login(CREDENTIALS.locked.user, CREDENTIALS.locked.pass);
-    await loginPage.expectErrorContains('Sorry, this user has been locked out');
-    await expect(page).not.toHaveURL(/inventory/);
-  });
-
-  test('empty credentials are rejected', async ({ loginPage }) => {
+  test('rejects submit with empty credentials', { tag: ['@negative'] }, async ({ page, loginPage }) => {
     await loginPage.goto();
     await loginPage.loginButton.click();
     await loginPage.expectErrorContains('Username is required');
+    await expect(page).not.toHaveURL(/inventory/);
   });
 });

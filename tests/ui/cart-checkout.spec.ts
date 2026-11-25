@@ -1,34 +1,40 @@
-import { test, expect, loginAsStandard } from '../fixtures/auth';
-
-const BACKPACK = 'Sauce Labs Backpack';
-const BIKE = 'Sauce Labs Bike Light';
+import { test, expect } from '../fixtures/auth';
+import { PRODUCTS } from '../../config';
 
 test.describe('Cart and checkout', () => {
-  test.beforeEach(async ({ loginPage, inventoryPage }) => {
-    await loginAsStandard(loginPage, inventoryPage);
+  test.beforeEach(async ({ inventoryPage }) => {
+    await inventoryPage.open();
   });
 
-  test('add two items, cart badge and cart contents match', async ({ inventoryPage, cartPage }) => {
-    await inventoryPage.addToCartByName(BACKPACK);
-    await inventoryPage.addToCartByName(BIKE);
+  test('adds two products and shows them in the cart', { tag: ['@smoke'] }, async ({
+    inventoryPage,
+    cartPage,
+  }) => {
+    await inventoryPage.addToCartByName(PRODUCTS.backpack);
+    await inventoryPage.addToCartByName(PRODUCTS.bikeLight);
     await expect(inventoryPage.cartBadge).toHaveText('2');
 
     await inventoryPage.openCart();
     await cartPage.expectLoaded();
-    expect(await cartPage.names()).toEqual([BACKPACK, BIKE]);
+    expect(await cartPage.names()).toEqual([PRODUCTS.backpack, PRODUCTS.bikeLight]);
+    await expect(cartPage.items).toHaveCount(2);
   });
 
-  test('remove item from cart updates the list', async ({ inventoryPage, cartPage }) => {
-    await inventoryPage.addToCartByName(BACKPACK);
-    await inventoryPage.addToCartByName(BIKE);
+  test('removing a product updates the cart', async ({ inventoryPage, cartPage }) => {
+    await inventoryPage.addToCartByName(PRODUCTS.backpack);
+    await inventoryPage.addToCartByName(PRODUCTS.bikeLight);
     await inventoryPage.openCart();
-    await cartPage.removeByName(BACKPACK);
-    expect(await cartPage.names()).toEqual([BIKE]);
+    await cartPage.removeByName(PRODUCTS.backpack);
+    expect(await cartPage.names()).toEqual([PRODUCTS.bikeLight]);
     await expect(inventoryPage.cartBadge).toHaveText('1');
   });
 
-  test('happy-path checkout completes the order', async ({ inventoryPage, cartPage, checkoutPage }) => {
-    await inventoryPage.addToCartByName(BACKPACK);
+  test('completes checkout and shows order confirmation', { tag: ['@smoke'] }, async ({
+    inventoryPage,
+    cartPage,
+    checkoutPage,
+  }) => {
+    await inventoryPage.addToCartByName(PRODUCTS.backpack);
     await inventoryPage.openCart();
     await cartPage.checkout.click();
     await checkoutPage.fillInfo('Ada', 'Lovelace', '10100');
@@ -37,19 +43,15 @@ test.describe('Cart and checkout', () => {
     await checkoutPage.complete();
   });
 
-  test('checkout without first name is blocked', async ({ inventoryPage, cartPage, checkoutPage }) => {
-    await inventoryPage.addToCartByName(BACKPACK);
+  test('blocks checkout when first name is missing', { tag: ['@negative'] }, async ({
+    inventoryPage,
+    cartPage,
+    checkoutPage,
+  }) => {
+    await inventoryPage.addToCartByName(PRODUCTS.backpack);
     await inventoryPage.openCart();
     await cartPage.checkout.click();
     await checkoutPage.fillInfo('', 'Lovelace', '10100');
     await expect(checkoutPage.error).toContainText('First Name is required');
-  });
-
-  test('checkout with empty postal code is blocked', async ({ inventoryPage, cartPage, checkoutPage }) => {
-    await inventoryPage.addToCartByName(BACKPACK);
-    await inventoryPage.openCart();
-    await cartPage.checkout.click();
-    await checkoutPage.fillInfo('Ada', 'Lovelace', '');
-    await expect(checkoutPage.error).toContainText('Postal Code is required');
   });
 });

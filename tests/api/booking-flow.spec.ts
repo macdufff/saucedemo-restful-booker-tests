@@ -1,57 +1,80 @@
 import { test, expect } from '@playwright/test';
 import { BookingClient, sampleBooking } from './booking.client';
+import { bookingSchema, createdBookingSchema, tokenSchema } from './booking.schema';
 
-test.describe.configure({ mode: 'serial' });
+test('booking lifecycle: auth, create, read, update, delete', { tag: ['@api', '@smoke'] }, async ({
+  request,
+}) => {
+  const client = new BookingClient(request);
+  let bookingId: number | undefined;
+  let token = '';
+  let cleanupFailure: string | undefined;
 
-test.describe('Restful Booker booking lifecycle', () => {
-  let token: string;
-  let bookingId: number;
+  try {
+    await test.step('authenticate', async () => {
+      const res = await client.auth();
+      expect(res.status(), await res.text()).toBe(200);
+      token = tokenSchema.parse(await res.json()).token;
+    });
 
-  test('auth returns a token', async ({ request }) => {
-    const res = await new BookingClient(request).auth();
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body.token).toEqual(expect.any(String));
-    expect(body.token.length).toBeGreaterThan(5);
-    token = body.token;
-  });
-
-  test('create booking returns id and payload', async ({ request }) => {
     const payload = sampleBooking();
-    const res = await new BookingClient(request).create(payload);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body.bookingid).toEqual(expect.any(Number));
-    expect(body.booking).toMatchObject(payload);
-    bookingId = body.bookingid;
-  });
 
-  test('get booking by id returns created data', async ({ request }) => {
-    const res = await new BookingClient(request).get(bookingId);
-    expect(res.status()).toBe(200);
-    expect(await res.json()).toMatchObject(sampleBooking());
-  });
+    await test.step('create booking', async () => {
+      const res = await client.create(payload);
+      expect(res.status(), await res.text()).toBe(200);
+      const body = createdBookingSchema.parse(await res.json());
+      expect(body.booking).toMatchObject(payload);
+      bookingId = body.bookingid;
+    });
 
-  test('update booking changes fields', async ({ request }) => {
+    await test.step('get booking by id', async () => {
+      const res = await client.get(bookingId as number);
+      expect(res.status()).toBe(200);
+      expect(bookingSchema.parse(await res.json())).toMatchObject(payload);
+    });
+
     const updated = sampleBooking({
       firstname: 'Grace',
       lastname: 'Hopper',
       totalprice: 250,
       additionalneeds: 'Late checkout',
     });
-    const res = await new BookingClient(request).update(bookingId, token, updated);
-    expect(res.status()).toBe(200);
-    expect(await res.json()).toMatchObject(updated);
 
-    const getRes = await new BookingClient(request).get(bookingId);
-    expect(await getRes.json()).toMatchObject({ firstname: 'Grace', lastname: 'Hopper' });
-  });
+    await test.step('update booking', async () => {
+      const res = await client.update(bookingId as number, token, updated);
+      expect(res.status(), await res.text()).toBe(200);
+      expect(bookingSchema.parse(await res.json())).toMatchObject(updated);
+    });
 
-  test('delete booking then GET returns 404', async ({ request }) => {
-    const del = await new BookingClient(request).remove(bookingId, token);
-    expect([201, 200]).toContain(del.status());
+    await test.step('verify updated booking', async () => {
+      const res = await client.get(bookingId as number);
+      expect(res.status()).toBe(200);
+      expect(await res.json()).toMatchObject({
+        firstname: 'Grace',
+        lastname: 'Hopper',
+        totalprice: 250,
+      });
+    });
 
-    const getRes = await new BookingClient(request).get(bookingId);
-    expect(getRes.status()).toBe(404);
-  });
+    await test.step('delete booking', async () => {
+      const res = await client.remove(bookingId as number, token);
+      // Observed contract: successful DELETE is often 201 Created.
+      expect([201, 200], `DELETE status ${res.status()}`).toContain(res.status());
+    });
+
+    await test.step('deleted booking is gone', async () => {
+      const res = await client.get(bookingId as number);
+      expect(res.status()).toBe(404);
+      bookingId = undefined;
+    });
+  } finally {
+    if (bookingId !== undefined && token) {
+      const cleanup = await client.remove(bookingId, token);
+      if (![200, 201, 404].includes(cleanup.status())) {
+        cleanupFailure = `Failed to clean up booking ${bookingId}: HTTP ${cleanup.status()}`;
+      }
+    }
+  }
+
+  expect(cleanupFailure, cleanupFailure).toBeUndefined();
 });

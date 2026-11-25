@@ -1,29 +1,25 @@
-# Agent instructions (QA automation)
+# Agent instructions
 
-You are helping maintain Playwright tests for:
-
-- UI: https://www.saucedemo.com (`standard_user` / `secret_sauce`)
-- API: https://restful-booker.herokuapp.com
+Playwright + TypeScript suite for Sauce Demo (UI) and Restful Booker (API).
 
 ## Rules
 
-- TypeScript only. Page Object Model lives in `pages/`. Tests go to `tests/ui` and `tests/api`.
-- Prefer `[data-test="..."]` locators on Sauce Demo. Do not use brittle XPath or CSS tied to class hashes.
-- Do not hard-wait (`page.waitForTimeout`). Use Playwright auto-waiting and `expect`.
-- Do not store secrets. Sauce Demo and Restful Booker credentials are public demo values.
-- Keep tests independent except the documented serial booking lifecycle in `tests/api/booking-flow.spec.ts`.
-- After changing tests, run `npx playwright test` (or the affected file).
-- If a third-party API returns a non-REST status (e.g. 500 on empty POST), assert the **observed** contract and mention it in README as a bug, do not silently “fix” the assertion to 200.
+- POM in `pages/`. UI specs in `tests/ui`. API specs in `tests/api`. Shared data in `config.ts`.
+- Locators: `getByRole`, `getByPlaceholder`, `getByTestId`. No XPath. Cart rows are `.cart_item` (no test id).
+- No `page.waitForTimeout`. No skipped tests. No empty catch blocks.
+- Restful Booker mutating calls use `Cookie: token=...`, not Bearer.
+- Successful DELETE is often HTTP 201. Empty POST `/booking` has been observed as HTTP 500.
+- Login specs must not use `storageState`. Catalog/cart/checkout reuse `playwright/.auth/standard.json` from the `setup` project.
+- After changing tests, run `npm run typecheck`, `npm run lint`, and the affected Playwright project.
 
 ## Commands
 
 ```bash
 npm ci
 npx playwright install chromium
-npx playwright test
+npm test
 ```
 
 ## Out of scope unless asked
 
-- Visual / pixel tests, performance, mobile browsers, other Sauce Demo users except negative locked_out_user.
-- Bonus generator (`bonus/`) unless the task is about generating tests from text.
+Visual tests, extra browsers, other Sauce Demo users, the optional generator in `bonus/`.

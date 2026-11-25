@@ -1,9 +1,6 @@
-# Cursor rules for this repo
-
-- Playwright + TypeScript. POM in `pages/`, tests in `tests/`.
-- Locators: `[data-test=...]` and roles, not nth-child chains.
-- No `waitForTimeout`. No skipping tests to “make CI green” without documenting why.
-- API client: `tests/api/booking.client.ts`. Auth header is Cookie `token=...` (not Bearer).
-- Restful Booker DELETE success is often **201**, not 204.
-- Sauce Demo cart rows are `.cart_item`, not `[data-test="inventory-item"]`.
-- Write Ukrainian or English comments only when they explain a non-obvious contract quirk.
+- Playwright + TypeScript. POM in pages/. Tests in tests/ui and tests/api.
+- Semantic locators first. Cart rows: .cart_item.
+- No waitForTimeout. No skipped tests.
+- API auth: Cookie token=, never Bearer.
+- Restful Booker DELETE success is often 201. Empty POST /booking has returned 500.
+- Do not add bonus/snapshots to the default Playwright projects.

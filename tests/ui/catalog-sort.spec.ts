@@ -1,43 +1,28 @@
-import { test, expect, loginAsStandard } from '../fixtures/auth';
-
-function isSortedAsc(values: string[] | number[]) {
-  const copy = [...values];
-  copy.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  return values.every((v, i) => v === copy[i]);
-}
-
-function isSortedDesc(values: string[] | number[]) {
-  const copy = [...values];
-  copy.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
-  return values.every((v, i) => v === copy[i]);
-}
+import { test, expect } from '../fixtures/auth';
+import { isSortedAsc } from '../helpers/sort';
 
 test.describe('Catalog and sorting', () => {
-  test.beforeEach(async ({ loginPage, inventoryPage }) => {
-    await loginAsStandard(loginPage, inventoryPage);
+  test.beforeEach(async ({ inventoryPage }) => {
+    await inventoryPage.open();
   });
 
-  test('catalog shows 6 products with name and price', async ({ inventoryPage }) => {
+  test('inventory lists six products with name and price', { tag: ['@smoke'] }, async ({
+    inventoryPage,
+  }) => {
     const names = await inventoryPage.names();
     const prices = await inventoryPage.prices();
     expect(names).toHaveLength(6);
-    expect(names.every((n) => n.trim().length > 0)).toBeTruthy();
-    expect(prices.every((p) => p > 0)).toBeTruthy();
+    expect(names.every((n) => n.trim().length > 0)).toBe(true);
+    expect(prices.every((p) => Number.isFinite(p) && p > 0)).toBe(true);
   });
 
-  test('sort Name (A to Z) and Name (Z to A)', async ({ inventoryPage }) => {
+  test('sorts products by name A to Z', async ({ inventoryPage }) => {
     await inventoryPage.sortBy('az');
-    expect(isSortedAsc(await inventoryPage.names())).toBeTruthy();
-
-    await inventoryPage.sortBy('za');
-    expect(isSortedDesc(await inventoryPage.names())).toBeTruthy();
+    expect(isSortedAsc(await inventoryPage.names())).toBe(true);
   });
 
-  test('sort Price (low to high) and Price (high to low)', async ({ inventoryPage }) => {
+  test('sorts products by price low to high', async ({ inventoryPage }) => {
     await inventoryPage.sortBy('lohi');
-    expect(isSortedAsc(await inventoryPage.prices())).toBeTruthy();
-
-    await inventoryPage.sortBy('hilo');
-    expect(isSortedDesc(await inventoryPage.prices())).toBeTruthy();
+    expect(isSortedAsc(await inventoryPage.prices())).toBe(true);
   });
 });

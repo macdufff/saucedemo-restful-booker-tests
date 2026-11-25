@@ -7,19 +7,19 @@ export class LoginPage {
   readonly error: Locator;
 
   constructor(private readonly page: Page) {
-    this.username = page.locator('[data-test="username"]');
-    this.password = page.locator('[data-test="password"]');
-    this.loginButton = page.locator('[data-test="login-button"]');
-    this.error = page.locator('[data-test="error"]');
+    this.username = page.getByPlaceholder('Username');
+    this.password = page.getByPlaceholder('Password');
+    this.loginButton = page.getByRole('button', { name: 'Login' });
+    this.error = page.getByTestId('error');
   }
 
   async goto() {
     await this.page.goto('/');
   }
 
-  async login(user: string, pass: string) {
-    await this.username.fill(user);
-    await this.password.fill(pass);
+  async login(username: string, password: string) {
+    await this.username.fill(username);
+    await this.password.fill(password);
     await this.loginButton.click();
   }
 

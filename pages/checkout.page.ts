@@ -4,8 +4,7 @@ export class CheckoutPage {
   readonly firstName: Locator;
   readonly lastName: Locator;
   readonly postalCode: Locator;
-  readonly continue: Locator;
-  readonly cancel: Locator;
+  readonly continueButton: Locator;
   readonly error: Locator;
   readonly finish: Locator;
   readonly completeHeader: Locator;
@@ -13,23 +12,22 @@ export class CheckoutPage {
   readonly overviewTitle: Locator;
 
   constructor(private readonly page: Page) {
-    this.firstName = page.locator('[data-test="firstName"]');
-    this.lastName = page.locator('[data-test="lastName"]');
-    this.postalCode = page.locator('[data-test="postalCode"]');
-    this.continue = page.locator('[data-test="continue"]');
-    this.cancel = page.locator('[data-test="cancel"]');
-    this.error = page.locator('[data-test="error"]');
-    this.finish = page.locator('[data-test="finish"]');
-    this.completeHeader = page.locator('[data-test="complete-header"]');
-    this.summaryTotal = page.locator('[data-test="total-label"]');
-    this.overviewTitle = page.locator('[data-test="title"]');
+    this.firstName = page.getByPlaceholder('First Name');
+    this.lastName = page.getByPlaceholder('Last Name');
+    this.postalCode = page.getByPlaceholder('Zip/Postal Code');
+    this.continueButton = page.getByRole('button', { name: 'Continue' });
+    this.error = page.getByTestId('error');
+    this.finish = page.getByRole('button', { name: 'Finish' });
+    this.completeHeader = page.getByTestId('complete-header');
+    this.summaryTotal = page.getByTestId('total-label');
+    this.overviewTitle = page.getByTestId('title');
   }
 
   async fillInfo(first: string, last: string, zip: string) {
     await this.firstName.fill(first);
     await this.lastName.fill(last);
     await this.postalCode.fill(zip);
-    await this.continue.click();
+    await this.continueButton.click();
   }
 
   async expectOverview() {

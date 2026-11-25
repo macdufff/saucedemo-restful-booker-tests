@@ -9,9 +9,31 @@
  *   npx tsx bonus/generate-test.ts --run bonus/examples/login.valid.md
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
+
+function loadDotEnv() {
+  const envPath = join(process.cwd(), '.env');
+  if (!existsSync(envPath)) return;
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+loadDotEnv();
 
 type CaseFile = {
   title: string;
@@ -105,10 +127,14 @@ ${body}
 
 async function generateFromLlm(c: CaseFile, raw: string): Promise<string> {
   const key = process.env.OPENAI_API_KEY;
-  if (!key) return generateFromRules(c);
+  if (!key) {
+    console.log('No OPENAI_API_KEY — generating with local rules');
+    return generateFromRules(c);
+  }
 
   const base = (process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
   const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+  console.log(`Calling LLM ${model} at ${base}`);
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -155,13 +181,35 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
   const outFile = join(outDir, `${slug(parsed.title)}.spec.ts`);
   writeFileSync(outFile, spec, 'utf8');
+  writeFileSync(
+    join(outDir, 'LAST_RUN.json'),
+    JSON.stringify(
+      {
+        at: new Date().toISOString(),
+        source: input,
+        output: outFile,
+        mode: process.env.OPENAI_API_KEY ? 'llm' : 'rules',
+        model: process.env.OPENAI_API_KEY
+          ? (process.env.OPENAI_MODEL ?? 'gpt-4o-mini')
+          : 'rules-engine',
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
   console.log(`Wrote ${outFile}`);
 
   if (shouldRun) {
     const run = spawnSync(
       'npx',
-      ['playwright', 'test', outFile, '--project=ui-chromium'],
-      { stdio: 'inherit' },
+      [
+        'playwright',
+        'test',
+        relative(process.cwd(), outFile),
+        '--config=bonus/playwright.live.config.ts',
+      ],
+      { stdio: 'inherit', env: process.env },
     );
     process.exit(run.status ?? 1);
   }

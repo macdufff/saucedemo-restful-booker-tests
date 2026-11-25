@@ -64,7 +64,16 @@ npm run test:report      # HTML report after a run
 2. lint + typecheck
 3. Playwright Chromium
 4. `npm test`
-5. Upload `playwright-report` (HTML + JUnit) even when tests fail
+5. Upload `playwright-report` as an artifact (always)
+6. On `push` / `workflow_dispatch`, publish the HTML report to **GitHub Pages** so it opens in the browser
+
+Hosted report (latest run on `main`):  
+https://macdufff.github.io/saucedemo-restful-booker-tests/
+
+In the Actions run: job **Open HTML report** → environment **github-pages** (the URL is also in the job summary).
+
+One-time repo setting: **Settings → Pages → Source: GitHub Actions**.  
+(PRs still attach the zip artifact; GitHub does not host Pages from fork PRs.)
 
 Retries (`2`) apply only when `CI=true`.
 

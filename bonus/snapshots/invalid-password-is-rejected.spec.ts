@@ -1,0 +1,9 @@
+import { test, expect } from '@playwright/test';
+
+test("invalid password is rejected", async ({ page }) => {
+  await page.goto('/');
+  await page.locator('[data-test="username"]').fill("standard_user");
+  await page.locator('[data-test="password"]').fill("wrong_password");
+  await page.locator('[data-test="login-button"]').click();
+  await expect(page.locator('[data-test="error"]')).toContainText('do not match');
+});

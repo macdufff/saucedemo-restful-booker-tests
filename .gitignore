@@ -1,0 +1,13 @@
+node_modules/
+.pw-browsers/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.env
+.env.*
+!.env.example
+# keep bonus/snapshots committed; generated is runtime output
+bonus/generated/
+.DS_Store
+dist/
